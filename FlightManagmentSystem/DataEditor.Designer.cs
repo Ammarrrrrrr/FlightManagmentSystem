@@ -44,11 +44,6 @@
             tabPage7 = new TabPage();
             dataGridView7 = new DataGridView();
             panel1 = new Panel();
-            button4 = new Button();
-            button5 = new Button();
-            button3 = new Button();
-            button2 = new Button();
-            button1 = new Button();
             tabControl1.SuspendLayout();
             tabPage1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView1).BeginInit();
@@ -100,7 +95,7 @@
             dataGridView1.Location = new Point(0, 0);
             dataGridView1.Name = "dataGridView1";
             dataGridView1.RowHeadersWidth = 62;
-            dataGridView1.Size = new Size(1287, 339);
+            dataGridView1.Size = new Size(1287, 296);
             dataGridView1.TabIndex = 0;
             // 
             // tabPage2
@@ -229,66 +224,16 @@
             // 
             panel1.Location = new Point(4, 336);
             panel1.Name = "panel1";
-            panel1.Size = new Size(1290, 418);
+            panel1.Size = new Size(1290, 438);
             panel1.TabIndex = 10;
-            // 
-            // button4
-            // 
-            button4.Location = new Point(366, 760);
-            button4.Name = "button4";
-            button4.Size = new Size(112, 34);
-            button4.TabIndex = 1;
-            button4.Text = "Delete";
-            button4.UseVisualStyleBackColor = true;
-            // 
-            // button5
-            // 
-            button5.Location = new Point(484, 760);
-            button5.Name = "button5";
-            button5.Size = new Size(112, 34);
-            button5.TabIndex = 1;
-            button5.Text = "Update";
-            button5.UseVisualStyleBackColor = true;
-            // 
-            // button3
-            // 
-            button3.Location = new Point(248, 760);
-            button3.Name = "button3";
-            button3.Size = new Size(112, 34);
-            button3.TabIndex = 1;
-            button3.Text = "Add";
-            button3.UseVisualStyleBackColor = true;
-            // 
-            // button2
-            // 
-            button2.Location = new Point(130, 760);
-            button2.Name = "button2";
-            button2.Size = new Size(112, 34);
-            button2.TabIndex = 1;
-            button2.Text = "Next";
-            button2.UseVisualStyleBackColor = true;
-            // 
-            // button1
-            // 
-            button1.Location = new Point(12, 760);
-            button1.Name = "button1";
-            button1.Size = new Size(112, 34);
-            button1.TabIndex = 1;
-            button1.Text = "Previous";
-            button1.UseVisualStyleBackColor = true;
             // 
             // DataEditor
             // 
             AutoScaleDimensions = new SizeF(10F, 25F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1294, 806);
+            ClientSize = new Size(1294, 775);
             Controls.Add(panel1);
             Controls.Add(tabControl1);
-            Controls.Add(button4);
-            Controls.Add(button1);
-            Controls.Add(button5);
-            Controls.Add(button2);
-            Controls.Add(button3);
             Name = "DataEditor";
             Text = "DataEditor";
             tabControl1.ResumeLayout(false);
@@ -326,11 +271,6 @@
         private DataGridView dataGridView5;
         private DataGridView dataGridView6;
         private DataGridView dataGridView7;
-        private Button button2;
-        private Button button1;
-        private Button button4;
-        private Button button5;
-        private Button button3;
         private Panel panel1;
     }
 }

@@ -17,7 +17,6 @@ namespace FlightManagmentSystem
         {
             InitializeComponent();
 
-            // Hook up dynamic textbox binding on form load
             this.Load += (s, e) =>
             {
                 foreach (TabPage tab in tabControl1.TabPages)
@@ -41,7 +40,8 @@ namespace FlightManagmentSystem
             {
                 string query = $"SELECT * FROM {table}";
                 MySqlCommand cmd = new MySqlCommand(query, database.mySqlConnection);
-                MySqlDataAdapter adapter = new MySqlDataAdapter(cmd);
+                MySqlDataAdapter adapter = new MySqlDataAdapter();
+                adapter.SelectCommand = cmd;
                 DataTable dt = new DataTable();
                 adapter.Fill(dt);
                 MySqlCommandBuilder builder = new MySqlCommandBuilder(adapter);
@@ -88,6 +88,8 @@ namespace FlightManagmentSystem
                     Width = 240
                 };
 
+                //textBox.TextChanged += (s, e) => ApplyFilter(grid);  // 🔥 This adds search behavior
+
                 panel.Controls.Add(label);
                 panel.Controls.Add(textBox);
 
@@ -97,10 +99,40 @@ namespace FlightManagmentSystem
 
             return map;
         }
+        private void ApplyFilter(DataGridView grid)
+        {
+            if (!gridTextBoxMaps.TryGetValue(grid, out var map) ||
+                !bindingSources.TryGetValue(grid, out var source) ||
+                source.DataSource is not DataTable dt)
+                return;
+
+            List<string> filters = new();
+
+            foreach (var kvp in map)
+            {
+                string column = kvp.Key;
+                string input = kvp.Value.Text.Trim().Replace("'", "''");
+
+                if (!string.IsNullOrEmpty(input))
+                {
+                    if (dt.Columns[column].DataType == typeof(string))
+                        filters.Add($"CONVERT([{column}], 'System.String') LIKE '%{input}%'");
+                    else
+                        filters.Add($"CONVERT([{column}], 'System.String') LIKE '{input}%'");
+                }
+            }
+
+            source.Filter = string.Join(" AND ", filters);
+        }
+
+
 
         private void AddCrudButtons(Panel panel, DataGridView grid)
         {
-            int y = panel.Controls.Count > 0 ? panel.Controls[panel.Controls.Count - 1].Bottom + 20 : 10;
+            int buttonWidth = 100;
+            int buttonHeight = 30;
+            int margin = 10;
+            int y = panel.Controls.Count > 0 ? panel.Controls[panel.Controls.Count - 1].Bottom + margin * 2 : 10;
             int x = 10;
 
             void AddButton(string text, EventHandler action)
@@ -109,11 +141,13 @@ namespace FlightManagmentSystem
                 {
                     Text = text,
                     Location = new Point(x, y),
-                    Width = 80
+                    Size = new Size(buttonWidth, buttonHeight),
+                    AutoSize = true,
+                    UseVisualStyleBackColor = true
                 };
                 button.Click += action;
                 panel.Controls.Add(button);
-                x += 90;
+                x += buttonWidth + margin;
             }
 
             AddButton("Previous", (s, e) => MovePrevious(grid));
@@ -121,6 +155,22 @@ namespace FlightManagmentSystem
             AddButton("Add", (s, e) => AddNewRow(grid));
             AddButton("Delete", (s, e) => DeleteSelectedRow(grid));
             AddButton("Save", (s, e) => SaveChanges(grid));
+            AddButton("Search", (s, e) => ApplyFilter(grid)); // 🔍 SEARCH
+            AddButton("Clear", (s, e) => ClearSearchAndSelection(grid)); // ❌ CLEAR
+        }
+
+        private void ClearSearchAndSelection(DataGridView grid)
+        {
+            if (gridTextBoxMaps.TryGetValue(grid, out var map))
+            {
+                foreach (var tb in map.Values)
+                    tb.Text = string.Empty;
+            }
+
+            if (bindingSources.TryGetValue(grid, out var source))
+                source.Filter = string.Empty;
+
+            grid.ClearSelection();
         }
 
         private void BindRowToTextboxes(DataGridView grid, Dictionary<string, TextBox> mapping)
@@ -141,17 +191,68 @@ namespace FlightManagmentSystem
 
         private void SaveChanges(DataGridView grid)
         {
-            if (tableAdapters.TryGetValue(grid, out var data))
+            if (!gridTextBoxMaps.TryGetValue(grid, out var map) ||
+                !tableAdapters.TryGetValue(grid, out var data) ||
+                !bindingSources.TryGetValue(grid, out var source))
+                return;
+
+            DataTable dt = data.Item1;
+            MySqlDataAdapter adapter = data.Item2;
+
+            if (adapter.SelectCommand == null)
             {
+                MessageBox.Show("Internal error: DataAdapter is not properly initialized.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            DataRow row;
+            bool isNewRow = false;
+
+            if (grid.CurrentRow == null || grid.CurrentRow.IsNewRow || source.Position < 0)
+            {
+                row = dt.NewRow();
+                dt.Rows.Add(row);
+                isNewRow = true;
+                source.MoveLast();
+            }
+            else
+            {
+                row = ((DataRowView)source.Current).Row;
+            }
+
+            foreach (var kvp in map)
+            {
+                string column = kvp.Key;
+                TextBox textBox = kvp.Value;
+                string value = textBox.Text.Trim();
+
+                if (!dt.Columns.Contains(column)) continue;
+
                 try
                 {
-                    data.Item2.Update(data.Item1);
-                    MessageBox.Show("Changes saved.");
+                    var colType = dt.Columns[column].DataType;
+                    object converted = string.IsNullOrWhiteSpace(value)
+                        ? DBNull.Value
+                        : Convert.ChangeType(value, Nullable.GetUnderlyingType(colType) ?? colType);
+
+                    row[column] = converted;
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Error saving: " + ex.Message);
+                    MessageBox.Show($"Invalid input for column '{column}': {ex.Message}");
+                    return;
                 }
+            }
+
+            try
+            {
+                adapter.Update(dt);
+                dt.AcceptChanges();
+                MessageBox.Show(isNewRow ? "New record inserted." : "Changes saved.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Database error: " + ex.Message);
             }
         }
 
@@ -166,8 +267,70 @@ namespace FlightManagmentSystem
 
         private void AddNewRow(DataGridView grid)
         {
-            if (bindingSources.TryGetValue(grid, out var source) && source.DataSource is DataTable dt)
-                dt.Rows.Add(dt.NewRow());
+            if (!gridTextBoxMaps.TryGetValue(grid, out var map) ||
+                !tableAdapters.TryGetValue(grid, out var data) ||
+                !bindingSources.TryGetValue(grid, out var source))
+            {
+                MessageBox.Show("Grid binding is not ready.");
+                return;
+            }
+
+            DataTable dt = data.Item1;
+            MySqlDataAdapter adapter = data.Item2;
+
+            if (adapter.SelectCommand == null)
+            {
+                MessageBox.Show("Internal error: DataAdapter is not properly initialized.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            DataRow newRow = dt.NewRow();
+
+            foreach (var kvp in map)
+            {
+                string columnName = kvp.Key;
+                TextBox textBox = kvp.Value;
+
+                if (!dt.Columns.Contains(columnName))
+                    continue;
+
+                string input = textBox.Text.Trim();
+                var column = dt.Columns[columnName];
+                object value;
+
+                try
+                {
+                    if (string.IsNullOrWhiteSpace(input))
+                    {
+                        value = DBNull.Value;
+                    }
+                    else
+                    {
+                        var colType = Nullable.GetUnderlyingType(column.DataType) ?? column.DataType;
+                        value = Convert.ChangeType(input, colType);
+                    }
+
+                    newRow[columnName] = value;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error in field '{columnName}': {ex.Message}", "Input Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+            }
+
+            dt.Rows.Add(newRow);
+            source.MoveLast();
+            ClearTextBoxes(map);
+            MessageBox.Show("Row added. You can continue entering data or save.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void ClearTextBoxes(Dictionary<string, TextBox> textBoxMap)
+        {
+            foreach (var tb in textBoxMap.Values)
+            {
+                tb.Text = string.Empty;
+            }
         }
 
         private void MovePrevious(DataGridView grid)
