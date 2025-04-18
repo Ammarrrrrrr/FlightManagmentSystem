@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace FlightManagmentSystem
@@ -22,13 +23,14 @@ namespace FlightManagmentSystem
                 foreach (TabPage tab in tabControl1.TabPages)
                 {
                     var grid = tab.Controls.OfType<DataGridView>().FirstOrDefault();
-                    var panel = tab.Controls.OfType<Panel>().FirstOrDefault();
-
                     if (grid != null)
-                        grid.SelectionChanged += (sender, args) => {
+                    {
+                        grid.SelectionChanged += (sender, args) =>
+                        {
                             if (gridTextBoxMaps.TryGetValue(grid, out var map))
                                 BindRowToTextboxes(grid, map);
                         };
+                    }
                 }
             };
         }
@@ -36,35 +38,32 @@ namespace FlightManagmentSystem
         public void LoadData(string table, DataGridView grid, Panel panel)
         {
             var database = new Database();
-            if (database.connect_db())
-            {
-                string query = $"SELECT * FROM {table}";
-                MySqlCommand cmd = new MySqlCommand(query, database.mySqlConnection);
-                MySqlDataAdapter adapter = new MySqlDataAdapter();
-                adapter.SelectCommand = cmd;
-                DataTable dt = new DataTable();
-                adapter.Fill(dt);
-                MySqlCommandBuilder builder = new MySqlCommandBuilder(adapter);
-
-                BindingSource source = new BindingSource();
-                source.DataSource = dt;
-                grid.DataSource = source;
-
-                tableAdapters[grid] = (dt, adapter);
-                bindingSources[grid] = source;
-
-                var textBoxMap = GenerateTextBoxesFromTable(dt, panel, grid);
-                gridTextBoxMaps[grid] = textBoxMap;
-
-                BindRowToTextboxes(grid, textBoxMap);
-                AddCrudButtons(panel, grid);
-
-                database.close_db();
-            }
-            else
+            if (!database.connect_db())
             {
                 MessageBox.Show("Database connection error");
+                return;
             }
+
+            string query = $"SELECT * FROM {table}";
+            MySqlCommand cmd = new(query, database.mySqlConnection);
+            MySqlDataAdapter adapter = new() { SelectCommand = cmd };
+            DataTable dt = new();
+            adapter.Fill(dt);
+            new MySqlCommandBuilder(adapter);
+
+            BindingSource source = new() { DataSource = dt };
+            grid.DataSource = source;
+
+            tableAdapters[grid] = (dt, adapter);
+            bindingSources[grid] = source;
+
+            var textBoxMap = GenerateTextBoxesFromTable(dt, panel, grid);
+            gridTextBoxMaps[grid] = textBoxMap;
+
+            BindRowToTextboxes(grid, textBoxMap);
+            AddCrudButtons(panel, grid);
+
+            database.close_db();
         }
 
         private Dictionary<string, TextBox> GenerateTextBoxesFromTable(DataTable table, Panel panel, DataGridView grid)
@@ -75,30 +74,40 @@ namespace FlightManagmentSystem
             int y = 10;
             foreach (DataColumn column in table.Columns)
             {
-                Label label = new Label
+                Label label = new()
                 {
                     Text = column.ColumnName,
                     Location = new Point(10, y),
                     Width = 150
                 };
-                TextBox textBox = new TextBox
+                TextBox textBox = new()
                 {
                     Name = $"txt{column.ColumnName}_{grid.Name}",
                     Location = new Point(160, y),
                     Width = 240
                 };
 
-                //textBox.TextChanged += (s, e) => ApplyFilter(grid);  // 🔥 This adds search behavior
-
                 panel.Controls.Add(label);
                 panel.Controls.Add(textBox);
-
                 map[column.ColumnName] = textBox;
                 y += 30;
             }
 
             return map;
         }
+
+        private void BindRowToTextboxes(DataGridView grid, Dictionary<string, TextBox> mapping)
+        {
+            if (grid.CurrentRow == null || grid.CurrentRow.Index < 0) return;
+
+            foreach (var (columnName, textBox) in mapping)
+            {
+                textBox.Text = grid.Columns.Contains(columnName)
+                    ? grid.CurrentRow.Cells[columnName].Value?.ToString() ?? ""
+                    : "";
+            }
+        }
+
         private void ApplyFilter(DataGridView grid)
         {
             if (!gridTextBoxMaps.TryGetValue(grid, out var map) ||
@@ -108,31 +117,25 @@ namespace FlightManagmentSystem
 
             List<string> filters = new();
 
-            foreach (var kvp in map)
+            foreach (var (column, textBox) in map)
             {
-                string column = kvp.Key;
-                string input = kvp.Value.Text.Trim().Replace("'", "''");
+                string input = textBox.Text.Trim().Replace("'", "''");
+                if (string.IsNullOrEmpty(input)) continue;
 
-                if (!string.IsNullOrEmpty(input))
-                {
-                    if (dt.Columns[column].DataType == typeof(string))
-                        filters.Add($"CONVERT([{column}], 'System.String') LIKE '%{input}%'");
-                    else
-                        filters.Add($"CONVERT([{column}], 'System.String') LIKE '{input}%'");
-                }
+                string filter = $"CONVERT([{column}], 'System.String') LIKE ";
+                filter += dt.Columns[column].DataType == typeof(string)
+                    ? $"'%{input}%'"
+                    : $"'{input}%'";
+                filters.Add(filter);
             }
 
             source.Filter = string.Join(" AND ", filters);
         }
 
-
-
         private void AddCrudButtons(Panel panel, DataGridView grid)
         {
-            int buttonWidth = 100;
-            int buttonHeight = 30;
-            int margin = 10;
-            int y = panel.Controls.Count > 0 ? panel.Controls[panel.Controls.Count - 1].Bottom + margin * 2 : 10;
+            int buttonWidth = 100, buttonHeight = 30, margin = 10;
+            int y = panel.Controls.Count > 0 ? panel.Controls[^1].Bottom + margin * 2 : 10;
             int x = 10;
 
             void AddButton(string text, EventHandler action)
@@ -155,38 +158,19 @@ namespace FlightManagmentSystem
             AddButton("Add", (s, e) => AddNewRow(grid));
             AddButton("Delete", (s, e) => DeleteSelectedRow(grid));
             AddButton("Save", (s, e) => SaveChanges(grid));
-            AddButton("Search", (s, e) => ApplyFilter(grid)); // 🔍 SEARCH
-            AddButton("Clear", (s, e) => ClearSearchAndSelection(grid)); // ❌ CLEAR
+            AddButton("Search", (s, e) => ApplyFilter(grid));
+            AddButton("Clear", (s, e) => ClearSearchAndSelection(grid));
         }
 
         private void ClearSearchAndSelection(DataGridView grid)
         {
             if (gridTextBoxMaps.TryGetValue(grid, out var map))
-            {
-                foreach (var tb in map.Values)
-                    tb.Text = string.Empty;
-            }
+                foreach (var tb in map.Values) tb.Text = string.Empty;
 
             if (bindingSources.TryGetValue(grid, out var source))
                 source.Filter = string.Empty;
 
             grid.ClearSelection();
-        }
-
-        private void BindRowToTextboxes(DataGridView grid, Dictionary<string, TextBox> mapping)
-        {
-            if (grid.CurrentRow == null || grid.CurrentRow.Index < 0) return;
-
-            foreach (var kv in mapping)
-            {
-                string columnName = kv.Key;
-                TextBox textBox = kv.Value;
-
-                if (grid.Columns.Contains(columnName))
-                    textBox.Text = grid.CurrentRow.Cells[columnName].Value?.ToString() ?? "";
-                else
-                    textBox.Text = "";
-            }
         }
 
         private void SaveChanges(DataGridView grid)
@@ -196,8 +180,7 @@ namespace FlightManagmentSystem
                 !bindingSources.TryGetValue(grid, out var source))
                 return;
 
-            DataTable dt = data.Item1;
-            MySqlDataAdapter adapter = data.Item2;
+            var (dt, adapter) = data;
 
             if (adapter.SelectCommand == null)
             {
@@ -220,21 +203,16 @@ namespace FlightManagmentSystem
                 row = ((DataRowView)source.Current).Row;
             }
 
-            foreach (var kvp in map)
+            foreach (var (column, textBox) in map)
             {
-                string column = kvp.Key;
-                TextBox textBox = kvp.Value;
-                string value = textBox.Text.Trim();
-
                 if (!dt.Columns.Contains(column)) continue;
 
                 try
                 {
                     var colType = dt.Columns[column].DataType;
-                    object converted = string.IsNullOrWhiteSpace(value)
+                    object converted = string.IsNullOrWhiteSpace(textBox.Text)
                         ? DBNull.Value
-                        : Convert.ChangeType(value, Nullable.GetUnderlyingType(colType) ?? colType);
-
+                        : Convert.ChangeType(textBox.Text.Trim(), Nullable.GetUnderlyingType(colType) ?? colType);
                     row[column] = converted;
                 }
                 catch (Exception ex)
@@ -256,15 +234,6 @@ namespace FlightManagmentSystem
             }
         }
 
-        private void DeleteSelectedRow(DataGridView grid)
-        {
-            foreach (DataGridViewRow row in grid.SelectedRows)
-            {
-                if (!row.IsNewRow)
-                    grid.Rows.RemoveAt(row.Index);
-            }
-        }
-
         private void AddNewRow(DataGridView grid)
         {
             if (!gridTextBoxMaps.TryGetValue(grid, out var map) ||
@@ -275,8 +244,7 @@ namespace FlightManagmentSystem
                 return;
             }
 
-            DataTable dt = data.Item1;
-            MySqlDataAdapter adapter = data.Item2;
+            var (dt, adapter) = data;
 
             if (adapter.SelectCommand == null)
             {
@@ -286,29 +254,17 @@ namespace FlightManagmentSystem
 
             DataRow newRow = dt.NewRow();
 
-            foreach (var kvp in map)
+            foreach (var (columnName, textBox) in map)
             {
-                string columnName = kvp.Key;
-                TextBox textBox = kvp.Value;
-
-                if (!dt.Columns.Contains(columnName))
-                    continue;
+                if (!dt.Columns.Contains(columnName)) continue;
 
                 string input = textBox.Text.Trim();
-                var column = dt.Columns[columnName];
-                object value;
 
                 try
                 {
-                    if (string.IsNullOrWhiteSpace(input))
-                    {
-                        value = DBNull.Value;
-                    }
-                    else
-                    {
-                        var colType = Nullable.GetUnderlyingType(column.DataType) ?? column.DataType;
-                        value = Convert.ChangeType(input, colType);
-                    }
+                    object value = string.IsNullOrWhiteSpace(input)
+                        ? DBNull.Value
+                        : Convert.ChangeType(input, Nullable.GetUnderlyingType(dt.Columns[columnName].DataType) ?? dt.Columns[columnName].DataType);
 
                     newRow[columnName] = value;
                 }
@@ -325,11 +281,12 @@ namespace FlightManagmentSystem
             MessageBox.Show("Row added. You can continue entering data or save.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
-        private void ClearTextBoxes(Dictionary<string, TextBox> textBoxMap)
+        private void DeleteSelectedRow(DataGridView grid)
         {
-            foreach (var tb in textBoxMap.Values)
+            foreach (DataGridViewRow row in grid.SelectedRows)
             {
-                tb.Text = string.Empty;
+                if (!row.IsNewRow)
+                    grid.Rows.RemoveAt(row.Index);
             }
         }
 
@@ -345,39 +302,18 @@ namespace FlightManagmentSystem
                 source.MoveNext();
         }
 
-        private void tabPage1_Enter(object sender, EventArgs e)
+        private void ClearTextBoxes(Dictionary<string, TextBox> textBoxMap)
         {
-            LoadData("aircraft", dataGridView1, panel1);
+            foreach (var tb in textBoxMap.Values)
+                tb.Text = string.Empty;
         }
 
-        private void tabPage2_Enter(object sender, EventArgs e)
-        {
-            LoadData("airlines", dataGridView2, panel1);
-        }
-
-        private void tabPage3_Enter(object sender, EventArgs e)
-        {
-            LoadData("airports", dataGridView3, panel1);
-        }
-
-        private void tabPage4_Enter(object sender, EventArgs e)
-        {
-            LoadData("airport_crew", dataGridView4, panel1);
-        }
-
-        private void tabPage5_Enter(object sender, EventArgs e)
-        {
-            LoadData("bookings", dataGridView5, panel1);
-        }
-
-        private void tabPage6_Enter(object sender, EventArgs e)
-        {
-            LoadData("flights", dataGridView6, panel1);
-        }
-
-        private void tabPage7_Enter(object sender, EventArgs e)
-        {
-            LoadData("passengers", dataGridView7, panel1);
-        }
+        private void tabPage1_Enter(object sender, EventArgs e) => LoadData("aircraft", dataGridView1, panel1);
+        private void tabPage2_Enter(object sender, EventArgs e) => LoadData("airlines", dataGridView2, panel1);
+        private void tabPage3_Enter(object sender, EventArgs e) => LoadData("airports", dataGridView3, panel1);
+        private void tabPage4_Enter(object sender, EventArgs e) => LoadData("airport_crew", dataGridView4, panel1);
+        private void tabPage5_Enter(object sender, EventArgs e) => LoadData("bookings", dataGridView5, panel1);
+        private void tabPage6_Enter(object sender, EventArgs e) => LoadData("flights", dataGridView6, panel1);
+        private void tabPage7_Enter(object sender, EventArgs e) => LoadData("passengers", dataGridView7, panel1);
     }
 }
