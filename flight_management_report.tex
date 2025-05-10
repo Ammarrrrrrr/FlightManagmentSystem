@@ -1,0 +1,1190 @@
+\documentclass[a4paper,12pt]{article}
+
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{geometry}
+\usepackage{longtable}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{positioning,shapes,arrows,fit,calc}
+
+% Code block styling
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+
+\lstset{style=mystyle}
+
+\geometry{margin=1in}
+
+\titleformat{\section}{\large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{1em}{}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=cyan,
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rfoot{\thepage}
+
+% Cover Page
+\title{\Huge Flight Management System\\[0.5cm]
+\Large Database Design and Implementation\\[1cm]
+\large Fundamentals of Database Systems (CSE462a)}
+\author{222321: Ammar ELsayed,220665: Adham Tamer \\[0.3cm]
+Supervised by: Dr. Ahmed Ayoub}
+
+
+\begin{document}
+
+% Cover Page
+\begin{titlepage}
+    \maketitle
+    \thispagestyle{empty}
+    \begin{center}
+        \vspace*{2cm}
+        \vspace*{8cm}
+        
+        \large Computer Systems Engineering\\
+        Faculty of Engineering\\
+        MSA University\\
+        \vspace*{1cm}
+        Academic Year 2023-2024
+    \end{center}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\begin{abstract}
+This document presents a detailed report on the Flight Management System project. The system aims to streamline airline operations by managing flights, bookings, aircraft, and passenger information. The report covers the database design, implementation details, query optimization techniques, and security measures implemented in the system. The project demonstrates the application of database design principles, including normalization, query optimization, and security implementation in a real-world scenario.
+\end{abstract}
+
+\section{Introduction}
+\subsection{Problem Statement}
+The aviation industry faces challenges in managing flight operations, passenger bookings, and aircraft information efficiently. The Flight Management System addresses these challenges by providing a comprehensive database solution that handles:
+\begin{itemize}
+    \item Flight scheduling and management
+    \item Passenger booking and check-in
+    \item Aircraft and airline information
+    \item Airport operations
+    \item Revenue tracking and reporting
+\end{itemize}
+
+\subsection{Objectives}
+The main objectives of this project are:
+\begin{itemize}
+    \item Design and implement a normalized database for flight management
+    \item Create efficient queries and stored procedures for common operations
+    \item Implement proper security measures and data integrity constraints
+    \item Optimize query performance through proper indexing
+    \item Provide comprehensive documentation and testing
+\end{itemize}
+
+\subsection{Scope}
+The system covers:
+\begin{itemize}
+    \item Flight scheduling and status tracking
+    \item Passenger booking management
+    \item Aircraft and airline information
+    \item Airport operations
+    \item Basic reporting and analytics
+\end{itemize}
+
+Limitations:
+\begin{itemize}
+    \item No real-time flight tracking
+    \item Limited to basic airline operations
+    \item No integration with external systems
+\end{itemize}
+
+\section{Database Design}
+\subsection{Entity-Relationship Diagram (ERD)}
+\begin{figure}[htbp]
+    \centering
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{er_diagram.png}
+        \caption{Entity-Relationship Diagram for Flight Management System}
+        \label{fig:erd}
+    \end{minipage}\hfill
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{er_diagram_dark.png}
+        \caption{Alternative ER Diagram}
+        \label{fig:erd-dark}
+    \end{minipage}
+\end{figure}
+
+\nopagebreak[4]
+The database consists of the following main entities:
+\begin{itemize}
+    \item Aircraft
+    \item Airlines
+    \item Airports
+    \item Airport Crew
+    \item Bookings
+    \item Flights
+    \item Passengers
+\end{itemize}
+
+Relationships:
+\begin{itemize}
+    \item Airlines own multiple Aircraft
+    \item Flights connect Airports
+    \item Passengers make Bookings
+    \item Flights have multiple Bookings
+    \item Airport Crew manage operations
+\end{itemize}
+
+\subsection{Normalization}
+The database is designed in Third Normal Form (3NF):
+\begin{itemize}
+    \item First Normal Form (1NF): All tables have primary keys and atomic values
+    \item Second Normal Form (2NF): All non-key attributes are fully dependent on primary keys
+    \item Third Normal Form (3NF): No transitive dependencies exist
+\end{itemize}
+
+\subsection{Schema Design}
+Key tables and their relationships:
+\begin{lstlisting}[language=SQL]
+CREATE TABLE aircraft (
+    aircraft_id INT PRIMARY KEY,
+    model VARCHAR(50),
+    manufacturer VARCHAR(50),
+    capacity INT,
+    range_km INT,
+    max_speed_kmh INT,
+    airline_id INT,
+    FOREIGN KEY (airline_id) REFERENCES airlines(airline_id)
+);
+
+CREATE TABLE flights (
+    flight_id INT PRIMARY KEY,
+    flight_number VARCHAR(10),
+    departure_airport_id INT,
+    arrival_airport_id INT,
+    departure_time DATETIME,
+    arrival_time DATETIME,
+    aircraft_id INT,
+    airline_id INT,
+    status ENUM('Scheduled','Boarding','In Air','Landed','Cancelled','Delayed'),
+    FOREIGN KEY (departure_airport_id) REFERENCES airports(airport_id),
+    FOREIGN KEY (arrival_airport_id) REFERENCES airports(airport_id),
+    FOREIGN KEY (aircraft_id) REFERENCES aircraft(aircraft_id),
+    FOREIGN KEY (airline_id) REFERENCES airlines(airline_id)
+);
+\end{lstlisting}
+
+\section{Implementation}
+\subsection{Database Tables}
+The system implements seven main tables with their respective schemas:
+
+\begin{lstlisting}[language=SQL, caption=Main Database Tables]
+-- Aircraft Table
+CREATE TABLE aircraft (
+    aircraft_id INT PRIMARY KEY,
+    model VARCHAR(50) NOT NULL,
+    manufacturer VARCHAR(50) NOT NULL,
+    capacity INT NOT NULL,
+    range_km INT NOT NULL,
+    max_speed_kmh INT,
+    airline_id INT,
+    FOREIGN KEY (airline_id) REFERENCES airlines(airline_id)
+);
+
+-- Airlines Table
+CREATE TABLE airlines (
+    airline_id INT PRIMARY KEY,
+    airline_name VARCHAR(100) NOT NULL,
+    iata_code CHAR(2) NOT NULL UNIQUE,
+    country VARCHAR(50) NOT NULL,
+    headquarters VARCHAR(100) NOT NULL,
+    founded_year INT
+);
+
+-- Airports Table
+CREATE TABLE airports (
+    airport_id INT PRIMARY KEY,
+    airport_name VARCHAR(100) NOT NULL,
+    iata_code CHAR(3) NOT NULL UNIQUE,
+    icao_code CHAR(4) NOT NULL UNIQUE,
+    city VARCHAR(50) NOT NULL,
+    country VARCHAR(50) NOT NULL,
+    latitude DECIMAL(10,6),
+    longitude DECIMAL(10,6)
+);
+\end{lstlisting}
+
+\subsection{SQL Queries}
+Example CRUD operations with detailed explanations:
+
+\begin{lstlisting}[language=SQL, caption=Create Operation - Booking a Flight]
+-- Create a new booking using stored procedure
+CALL BookFlight(
+    p_flight_id => 1,
+    p_passenger_id => 1,
+    p_seat_number => '1A',
+    p_class => 'Business'
+);
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption=Read Operation - Get Flight Details]
+-- Retrieve detailed flight information
+CALL GetFlightDetails(1);
+
+-- Alternative direct query
+SELECT 
+    f.flight_number,
+    f.departure_time,
+    f.arrival_time,
+    f.status,
+    dep.airport_name as departure_airport,
+    arr.airport_name as arrival_airport,
+    a.model as aircraft_model,
+    al.airline_name
+FROM flights f
+JOIN airports dep ON f.departure_airport_id = dep.airport_id
+JOIN airports arr ON f.arrival_airport_id = arr.airport_id
+JOIN aircraft a ON f.aircraft_id = a.aircraft_id
+JOIN airlines al ON f.airline_id = al.airline_id
+WHERE f.flight_id = 1;
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption=Update Operation - Change Flight Status]
+-- Update flight status with transaction
+START TRANSACTION;
+    UPDATE flights 
+    SET status = 'Boarding' 
+    WHERE flight_id = 1;
+    
+    UPDATE bookings 
+    SET status = 'Boarded' 
+    WHERE flight_id = 1;
+COMMIT;
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption=Delete Operation - Remove Cancelled Booking]
+-- Delete cancelled booking with validation
+DELETE FROM bookings 
+WHERE status = 'Cancelled' 
+AND booking_date < DATE_SUB(NOW(), INTERVAL 30 DAY);
+\end{lstlisting}
+
+\subsection{Stored Procedures}
+Key stored procedures with their implementations:
+
+\begin{lstlisting}[language=SQL, caption=BookFlight Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE BookFlight(
+    IN p_flight_id INT,
+    IN p_passenger_id INT,
+    IN p_seat_number VARCHAR(10),
+    IN p_class ENUM('Economy','Business','First')
+)
+BEGIN
+    DECLARE v_price DECIMAL(10,2);
+    
+    -- Get the price based on class
+    SELECT 
+        CASE p_class
+            WHEN 'Economy' THEN price_economy
+            WHEN 'Business' THEN price_business
+            WHEN 'First' THEN price_first
+        END INTO v_price
+    FROM flights 
+    WHERE flight_id = p_flight_id;
+    
+    -- Insert the booking
+    INSERT INTO bookings (
+        flight_id, 
+        passenger_id, 
+        seat_number, 
+        class, 
+        price_paid, 
+        status
+    )
+    VALUES (
+        p_flight_id, 
+        p_passenger_id, 
+        p_seat_number, 
+        p_class, 
+        v_price, 
+        'Confirmed'
+    );
+END //
+DELIMITER ;
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption=GetFlightStatistics Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE GetFlightStatistics(IN p_airline_id INT)
+BEGIN
+    SELECT 
+        COUNT(*) as total_flights,
+        SUM(CASE WHEN status = 'Scheduled' THEN 1 ELSE 0 END) as scheduled_flights,
+        SUM(CASE WHEN status = 'In Air' THEN 1 ELSE 0 END) as in_air_flights,
+        SUM(CASE WHEN status = 'Landed' THEN 1 ELSE 0 END) as landed_flights,
+        AVG(price_economy) as avg_economy_price,
+        AVG(price_business) as avg_business_price,
+        AVG(price_first) as avg_first_price
+    FROM flights
+    WHERE airline_id = p_airline_id;
+END //
+DELIMITER ;
+\end{lstlisting}
+
+\subsection{Generalized CRUD Stored Procedures}
+For maintainability and performance, each main table in the system is managed using a set of CRUD (Create, Read, Update, Delete) stored procedures. This approach ensures all data access is optimized, secure, and consistent.
+
+\subsubsection{Aircraft Table CRUD Procedures}
+\textbf{1. Get All Aircraft}
+
+Retrieves all aircraft records.
+\begin{lstlisting}[language=SQL, caption=GetAllAircraft Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE GetAllAircraft()
+BEGIN
+    SELECT * FROM aircraft;
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL GetAllAircraft();
+\end{lstlisting}
+
+\textbf{2. Insert Aircraft}
+
+Inserts a new aircraft record.
+\begin{lstlisting}[language=SQL, caption=InsertAircraft Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE InsertAircraft(
+    IN p_model VARCHAR(50),
+    IN p_manufacturer VARCHAR(50),
+    IN p_capacity INT,
+    IN p_range_km INT,
+    IN p_max_speed_kmh INT,
+    IN p_airline_id INT
+)
+BEGIN
+    INSERT INTO aircraft (model, manufacturer, capacity, range_km, max_speed_kmh, airline_id)
+    VALUES (p_model, p_manufacturer, p_capacity, p_range_km, p_max_speed_kmh, p_airline_id);
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL InsertAircraft('Boeing 737 MAX 9', 'Boeing', 193, 6570, 842, 1);
+\end{lstlisting}
+
+\textbf{3. Update Aircraft}
+
+Updates an existing aircraft record.
+\begin{lstlisting}[language=SQL, caption=UpdateAircraft Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE UpdateAircraft(
+    IN p_aircraft_id INT,
+    IN p_model VARCHAR(50),
+    IN p_manufacturer VARCHAR(50),
+    IN p_capacity INT,
+    IN p_range_km INT,
+    IN p_max_speed_kmh INT,
+    IN p_airline_id INT
+)
+BEGIN
+    UPDATE aircraft
+    SET model = p_model,
+        manufacturer = p_manufacturer,
+        capacity = p_capacity,
+        range_km = p_range_km,
+        max_speed_kmh = p_max_speed_kmh,
+        airline_id = p_airline_id
+    WHERE aircraft_id = p_aircraft_id;
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL UpdateAircraft(1, 'Boeing 737 MAX 9', 'Boeing', 193, 6570, 842, 1);
+\end{lstlisting}
+
+\textbf{4. Delete Aircraft}
+
+Deletes an aircraft record by its ID.
+\begin{lstlisting}[language=SQL, caption=DeleteAircraft Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE DeleteAircraft(IN p_aircraft_id INT)
+BEGIN
+    DELETE FROM aircraft WHERE aircraft_id = p_aircraft_id;
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL DeleteAircraft(1);
+\end{lstlisting}
+
+% Airlines Table
+\subsubsection{Airlines Table CRUD Procedures}
+\textbf{1. Get All Airlines}
+
+Retrieves all airline records.
+\begin{lstlisting}[language=SQL, caption=GetAllAirlines Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE GetAllAirlines()
+BEGIN
+    SELECT * FROM airlines;
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL GetAllAirlines();
+\end{lstlisting}
+
+\textbf{2. Insert Airline}
+
+Inserts a new airline record.
+\begin{lstlisting}[language=SQL, caption=InsertAirline Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE InsertAirline(
+    IN p_airline_name VARCHAR(100),
+    IN p_iata_code CHAR(2),
+    IN p_country VARCHAR(50),
+    IN p_headquarters VARCHAR(100),
+    IN p_founded_year INT
+)
+BEGIN
+    INSERT INTO airlines (airline_name, iata_code, country, headquarters, founded_year)
+    VALUES (p_airline_name, p_iata_code, p_country, p_headquarters, p_founded_year);
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL InsertAirline('Sample Airline', 'SA', 'Country', 'HQ City', 2024);
+\end{lstlisting}
+
+\textbf{3. Update Airline}
+
+Updates an existing airline record.
+\begin{lstlisting}[language=SQL, caption=UpdateAirline Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE UpdateAirline(
+    IN p_airline_id INT,
+    IN p_airline_name VARCHAR(100),
+    IN p_iata_code CHAR(2),
+    IN p_country VARCHAR(50),
+    IN p_headquarters VARCHAR(100),
+    IN p_founded_year INT
+)
+BEGIN
+    UPDATE airlines
+    SET airline_name = p_airline_name,
+        iata_code = p_iata_code,
+        country = p_country,
+        headquarters = p_headquarters,
+        founded_year = p_founded_year
+    WHERE airline_id = p_airline_id;
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL UpdateAirline(1, 'Updated Airline', 'UA', 'Country', 'HQ City', 2025);
+\end{lstlisting}
+
+\textbf{4. Delete Airline}
+
+Deletes an airline record by its ID.
+\begin{lstlisting}[language=SQL, caption=DeleteAirline Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE DeleteAirline(IN p_airline_id INT)
+BEGIN
+    DELETE FROM airlines WHERE airline_id = p_airline_id;
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL DeleteAirline(1);
+\end{lstlisting}
+
+% Airports Table
+\subsubsection{Airports Table CRUD Procedures}
+
+\begin{lstlisting}[language=SQL, caption=GetAllAirports Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE GetAllAirports()
+BEGIN
+    SELECT * FROM airports;
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL GetAllAirports();
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption=InsertAirport Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE InsertAirport(
+    IN p_airport_name VARCHAR(100),
+    IN p_iata_code CHAR(3),
+    IN p_icao_code CHAR(4),
+    IN p_city VARCHAR(50),
+    IN p_country VARCHAR(50),
+    IN p_latitude DECIMAL(10,6),
+    IN p_longitude DECIMAL(10,6)
+)
+BEGIN
+    INSERT INTO airports (airport_name, iata_code, icao_code, city, country, latitude, longitude)
+    VALUES (p_airport_name, p_iata_code, p_icao_code, p_city, p_country, p_latitude, p_longitude);
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL InsertAirport('Sample Airport', 'SAP', 'SAPP', 'Sample City', 'Sample Country', 12.345678, 98.765432);
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption=UpdateAirport Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE UpdateAirport(
+    IN p_airport_id INT,
+    IN p_airport_name VARCHAR(100),
+    IN p_iata_code CHAR(3),
+    IN p_icao_code CHAR(4),
+    IN p_city VARCHAR(50),
+    IN p_country VARCHAR(50),
+    IN p_latitude DECIMAL(10,6),
+    IN p_longitude DECIMAL(10,6)
+)
+BEGIN
+    UPDATE airports
+    SET airport_name = p_airport_name,
+        iata_code = p_iata_code,
+        icao_code = p_icao_code,
+        city = p_city,
+        country = p_country,
+        latitude = p_latitude,
+        longitude = p_longitude
+    WHERE airport_id = p_airport_id;
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL UpdateAirport(1, 'Updated Airport', 'UAP', 'UAPP', 'Updated City', 'Updated Country', 11.111111, 22.222222);
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption=DeleteAirport Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE DeleteAirport(IN p_airport_id INT)
+BEGIN
+    DELETE FROM airports WHERE airport_id = p_airport_id;
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL DeleteAirport(1);
+\end{lstlisting}
+
+% Airport Crew Table
+\subsubsection{Airport Crew Table CRUD Procedures}
+
+\begin{lstlisting}[language=SQL, caption=GetAllAirportCrew Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE GetAllAirportCrew()
+BEGIN
+    SELECT * FROM airport_crew;
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL GetAllAirportCrew();
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption=InsertAirportCrew Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE InsertAirportCrew(
+    IN p_first_name VARCHAR(50),
+    IN p_last_name VARCHAR(50),
+    IN p_role VARCHAR(50),
+    IN p_phone_number VARCHAR(20),
+    IN p_email VARCHAR(100),
+    IN p_username VARCHAR(50),
+    IN p_password_hash VARCHAR(255)
+)
+BEGIN
+    INSERT INTO airport_crew (first_name, last_name, role, phone_number, email, username, password_hash)
+    VALUES (p_first_name, p_last_name, p_role, p_phone_number, p_email, p_username, p_password_hash);
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL InsertAirportCrew('John', 'Doe', 'Supervisor', '+1234567890', 'john.doe@example.com', 'johndoe', 'hashedpassword');
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption=UpdateAirportCrew Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE UpdateAirportCrew(
+    IN p_crew_id INT,
+    IN p_first_name VARCHAR(50),
+    IN p_last_name VARCHAR(50),
+    IN p_role VARCHAR(50),
+    IN p_phone_number VARCHAR(20),
+    IN p_email VARCHAR(100),
+    IN p_username VARCHAR(50),
+    IN p_password_hash VARCHAR(255)
+)
+BEGIN
+    UPDATE airport_crew
+    SET first_name = p_first_name,
+        last_name = p_last_name,
+        role = p_role,
+        phone_number = p_phone_number,
+        email = p_email,
+        username = p_username,
+        password_hash = p_password_hash
+    WHERE crew_id = p_crew_id;
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL UpdateAirportCrew(1, 'Jane', 'Smith', 'Manager', '+1987654321', 'jane.smith@example.com', 'janesmith', 'newhash');
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption=DeleteAirportCrew Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE DeleteAirportCrew(IN p_crew_id INT)
+BEGIN
+    DELETE FROM airport_crew WHERE crew_id = p_crew_id;
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL DeleteAirportCrew(1);
+\end{lstlisting}
+
+% Passengers Table
+\subsubsection{Passengers Table CRUD Procedures}
+
+\begin{lstlisting}[language=SQL, caption=GetAllPassengers Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE GetAllPassengers()
+BEGIN
+    SELECT * FROM passengers;
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL GetAllPassengers();
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption=InsertPassenger Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE InsertPassenger(
+    IN p_first_name VARCHAR(50),
+    IN p_last_name VARCHAR(50),
+    IN p_passport_number VARCHAR(20),
+    IN p_nationality VARCHAR(50),
+    IN p_date_of_birth DATE,
+    IN p_gender ENUM('Male','Female','Other')
+)
+BEGIN
+    INSERT INTO passengers (first_name, last_name, passport_number, nationality, date_of_birth, gender)
+    VALUES (p_first_name, p_last_name, p_passport_number, p_nationality, p_date_of_birth, p_gender);
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL InsertPassenger('Alice', 'Brown', 'P1234567', 'Country', '1990-01-01', 'Female');
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption=UpdatePassenger Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE UpdatePassenger(
+    IN p_passenger_id INT,
+    IN p_first_name VARCHAR(50),
+    IN p_last_name VARCHAR(50),
+    IN p_passport_number VARCHAR(20),
+    IN p_nationality VARCHAR(50),
+    IN p_date_of_birth DATE,
+    IN p_gender ENUM('Male','Female','Other')
+)
+BEGIN
+    UPDATE passengers
+    SET first_name = p_first_name,
+        last_name = p_last_name,
+        passport_number = p_passport_number,
+        nationality = p_nationality,
+        date_of_birth = p_date_of_birth,
+        gender = p_gender
+    WHERE passenger_id = p_passenger_id;
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL UpdatePassenger(1, 'Bob', 'Green', 'P7654321', 'Country', '1985-05-05', 'Male');
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption=DeletePassenger Stored Procedure]
+DELIMITER //
+CREATE PROCEDURE DeletePassenger(IN p_passenger_id INT)
+BEGIN
+    DELETE FROM passengers WHERE passenger_id = p_passenger_id;
+END //
+DELIMITER ;
+\end{lstlisting}
+Example:
+\begin{lstlisting}[language=SQL]
+CALL DeletePassenger(1);
+\end{lstlisting}
+
+\subsection{Advanced SQL Queries}
+\begin{lstlisting}[language=SQL, caption=Complex Booking Analysis Query]
+-- Analyze booking patterns and revenue
+SELECT 
+    f.flight_number,
+    f.departure_time,
+    f.arrival_time,
+    COUNT(b.booking_id) as total_bookings,
+    SUM(CASE WHEN b.class = 'Economy' THEN 1 ELSE 0 END) as economy_bookings,
+    SUM(CASE WHEN b.class = 'Business' THEN 1 ELSE 0 END) as business_bookings,
+    SUM(CASE WHEN b.class = 'First' THEN 1 ELSE 0 END) as first_bookings,
+    SUM(b.price_paid) as total_revenue,
+    AVG(b.price_paid) as average_price
+FROM flights f
+LEFT JOIN bookings b ON f.flight_id = b.flight_id
+WHERE f.departure_time BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+GROUP BY f.flight_id, f.flight_number, f.departure_time, f.arrival_time
+ORDER BY total_revenue DESC;
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption=Aircraft Utilization Analysis]
+-- Analyze aircraft utilization and maintenance needs
+SELECT 
+    a.model,
+    a.manufacturer,
+    COUNT(f.flight_id) as total_flights,
+    SUM(TIMESTAMPDIFF(HOUR, f.departure_time, f.arrival_time)) as total_hours,
+    AVG(TIMESTAMPDIFF(HOUR, f.departure_time, f.arrival_time)) as avg_flight_duration,
+    COUNT(DISTINCT f.departure_airport_id) as unique_routes
+FROM aircraft a
+LEFT JOIN flights f ON a.aircraft_id = f.aircraft_id
+WHERE f.departure_time >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+GROUP BY a.aircraft_id, a.model, a.manufacturer
+ORDER BY total_hours DESC;
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption=Passenger Travel History]
+-- Get detailed passenger travel history
+SELECT 
+    p.first_name,
+    p.last_name,
+    p.passport_number,
+    COUNT(b.booking_id) as total_trips,
+    SUM(b.price_paid) as total_spent,
+    MAX(b.booking_date) as last_trip_date,
+    GROUP_CONCAT(DISTINCT f.flight_number) as flight_numbers,
+    GROUP_CONCAT(DISTINCT dep.city) as visited_cities
+FROM passengers p
+JOIN bookings b ON p.passenger_id = b.passenger_id
+JOIN flights f ON b.flight_id = f.flight_id
+JOIN airports dep ON f.departure_airport_id = dep.airport_id
+GROUP BY p.passenger_id, p.first_name, p.last_name, p.passport_number
+HAVING total_trips > 1
+ORDER BY total_spent DESC;
+\end{lstlisting}
+
+\section{GUI Implementation}
+\subsection{Overview}
+The Flight Management System includes a Windows Forms application developed in C\# that provides a comprehensive interface for managing all aspects of the flight management system. The application features a tabbed interface for managing different entities (aircraft, airlines, airports, crew, bookings, flights, and passengers) with full CRUD operations.
+
+\subsection{Database Connection}
+The application uses MySQL as its database backend. The database connection is managed through a dedicated class:
+
+\begin{lstlisting}[language=CSharp, caption=Database Connection Class]
+internal class Database
+{
+    static readonly string server = "localhost";
+    static readonly string user = "root";
+    static readonly string pass = "";
+    static readonly string db = "flight_management";
+    public static string conStr = "server='" + server + "'; user= '" + user + "'; database= '" + db + "'; password='" + pass + "'";
+    public MySqlConnection mySqlConnection = new MySqlConnection(conStr);
+
+    public bool connect_db()
+    {
+        try
+        {
+            mySqlConnection.Open();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            return false;
+        }
+    }
+
+    public bool close_db()
+    {
+        try
+        {
+            mySqlConnection.Close();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            return false;
+        }
+    }
+}
+\end{lstlisting}
+
+\subsection{Data Editor Form}
+The main interface of the application is implemented in the DataEditor form, which provides a unified interface for managing all database tables. Key features include:
+
+\begin{itemize}
+    \item Tabbed interface for different entities
+    \item Dynamic form generation based on table structure
+    \item CRUD operations (Create, Read, Update, Delete)
+    \item Search and filter capabilities
+    \item Data validation and error handling
+\end{itemize}
+
+\begin{lstlisting}[language=CSharp, caption=Data Editor Form Implementation]
+public partial class DataEditor : Form
+{
+    private Dictionary<DataGridView, (DataTable, MySqlDataAdapter)> tableAdapters = new();
+    private Dictionary<DataGridView, BindingSource> bindingSources = new();
+    private Dictionary<DataGridView, Dictionary<string, TextBox>> gridTextBoxMaps = new();
+
+    public DataEditor()
+    {
+        InitializeComponent();
+        // Initialize event handlers for grid selection changes
+        this.Load += (s, e) =>
+        {
+            foreach (TabPage tab in tabControl1.TabPages)
+            {
+                var grid = tab.Controls.OfType<DataGridView>().FirstOrDefault();
+                if (grid != null)
+                {
+                    grid.SelectionChanged += (sender, args) =>
+                    {
+                        if (gridTextBoxMaps.TryGetValue(grid, out var map))
+                            BindRowToTextboxes(grid, map);
+                    };
+                }
+            }
+        };
+    }
+
+    // Load data for a specific table
+    public void LoadData(string table, DataGridView grid, Panel panel)
+    {
+        var database = new Database();
+        if (!database.connect_db())
+        {
+            MessageBox.Show("Database connection error");
+            return;
+        }
+
+        string query = $"SELECT * FROM {table}";
+        MySqlCommand cmd = new(query, database.mySqlConnection);
+        MySqlDataAdapter adapter = new() { SelectCommand = cmd };
+        DataTable dt = new();
+        adapter.Fill(dt);
+        new MySqlCommandBuilder(adapter);
+
+        BindingSource source = new() { DataSource = dt };
+        grid.DataSource = source;
+
+        tableAdapters[grid] = (dt, adapter);
+        bindingSources[grid] = source;
+
+        var textBoxMap = GenerateTextBoxesFromTable(dt, panel, grid);
+        gridTextBoxMaps[grid] = textBoxMap;
+
+        BindRowToTextboxes(grid, textBoxMap);
+        AddCrudButtons(panel, grid);
+
+        database.close_db();
+    }
+}
+\end{lstlisting}
+
+\subsection{Key Features Implementation}
+
+\subsubsection{Dynamic Form Generation}
+The application dynamically generates input fields based on the table structure:
+
+\begin{lstlisting}[language=CSharp, caption=Dynamic Form Generation]
+private Dictionary<string, TextBox> GenerateTextBoxesFromTable(DataTable table, Panel panel, DataGridView grid)
+{
+    Dictionary<string, TextBox> map = new();
+    panel.Controls.Clear();
+
+    int y = 10;
+    foreach (DataColumn column in table.Columns)
+    {
+        Label label = new()
+        {
+            Text = column.ColumnName,
+            Location = new Point(10, y),
+            Width = 150
+        };
+        TextBox textBox = new()
+        {
+            Name = $"txt{column.ColumnName}_{grid.Name}",
+            Location = new Point(160, y),
+            Width = 240
+        };
+
+        panel.Controls.Add(label);
+        panel.Controls.Add(textBox);
+        map[column.ColumnName] = textBox;
+        y += 30;
+    }
+
+    return map;
+}
+\end{lstlisting}
+
+\subsubsection{CRUD Operations}
+The application implements comprehensive CRUD operations with proper error handling:
+
+\begin{lstlisting}[language=CSharp, caption=Save Changes Implementation]
+private void SaveChanges(DataGridView grid)
+{
+    if (!gridTextBoxMaps.TryGetValue(grid, out var map) ||
+        !tableAdapters.TryGetValue(grid, out var data) ||
+        !bindingSources.TryGetValue(grid, out var source))
+        return;
+
+    var (dt, adapter) = data;
+
+    if (adapter.SelectCommand == null)
+    {
+        MessageBox.Show("Internal error: DataAdapter is not properly initialized.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        return;
+    }
+
+    DataRow row;
+    bool isNewRow = false;
+
+    if (grid.CurrentRow == null || grid.CurrentRow.IsNewRow || source.Position < 0)
+    {
+        row = dt.NewRow();
+        dt.Rows.Add(row);
+        isNewRow = true;
+        source.MoveLast();
+    }
+    else
+    {
+        row = ((DataRowView)source.Current).Row;
+    }
+
+    foreach (var (column, textBox) in map)
+    {
+        if (!dt.Columns.Contains(column)) continue;
+
+        try
+        {
+            var colType = dt.Columns[column].DataType;
+            object converted = string.IsNullOrWhiteSpace(textBox.Text)
+                ? DBNull.Value
+                : Convert.ChangeType(textBox.Text.Trim(), Nullable.GetUnderlyingType(colType) ?? colType);
+            row[column] = converted;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Invalid input for column '{column}': {ex.Message}");
+            return;
+        }
+    }
+
+    try
+    {
+        adapter.Update(dt);
+        dt.AcceptChanges();
+        MessageBox.Show(isNewRow ? "New record inserted." : "Changes saved.");
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show("Database error: " + ex.Message);
+    }
+}
+\end{lstlisting}
+
+\subsection{Table Management}
+The application manages seven main tables through tabbed interfaces:
+
+\begin{itemize}
+    \item Aircraft Management
+    \item Airlines Management
+    \item Airports Management
+    \item Airport Crew Management
+    \item Bookings Management
+    \item Flights Management
+    \item Passengers Management
+\end{itemize}
+
+Each table is loaded automatically when its tab is selected:
+
+\begin{lstlisting}[language=CSharp, caption=Table Loading Events]
+private void tabPage1_Enter(object sender, EventArgs e) => LoadData("aircraft", dataGridView1, panel1);
+private void tabPage2_Enter(object sender, EventArgs e) => LoadData("airlines", dataGridView2, panel1);
+private void tabPage3_Enter(object sender, EventArgs e) => LoadData("airports", dataGridView3, panel1);
+private void tabPage4_Enter(object sender, EventArgs e) => LoadData("airport_crew", dataGridView4, panel1);
+private void tabPage5_Enter(object sender, EventArgs e) => LoadData("bookings", dataGridView5, panel1);
+private void tabPage6_Enter(object sender, EventArgs e) => LoadData("flights", dataGridView6, panel1);
+private void tabPage7_Enter(object sender, EventArgs e) => LoadData("passengers", dataGridView7, panel1);
+\end{lstlisting}
+
+\subsection{User Interface Features}
+The application provides a user-friendly interface with the following features:
+
+\begin{itemize}
+    \item Navigation buttons (Previous, Next) for browsing records
+    \item Add button for creating new records
+    \item Delete button for removing records
+    \item Save button for persisting changes
+    \item Search functionality for filtering records
+    \item Clear button for resetting search criteria
+\end{itemize}
+
+Each feature is implemented with proper error handling and user feedback through message boxes.
+
+\subsection{Data Validation and Error Handling}
+The application implements comprehensive data validation and error handling:
+
+\begin{itemize}
+    \item Type conversion validation for all input fields
+    \item Database connection error handling
+    \item SQL operation error handling
+    \item User-friendly error messages
+    \item Transaction management for critical operations
+\end{itemize}
+
+% Add screenshots of your application here
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\textwidth]{data_editor.png}
+\caption{Data Editor Interface}
+\label{fig:data_editor}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\textwidth]{aircraft_management.png}
+\caption{Aircraft Management Interface}
+\label{fig:aircraft_management}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\textwidth]{flight_management.png}
+\caption{Flight Management Interface}
+\label{fig:flight_management}
+\end{figure}
+
+\section{Data Integrity and Security}
+\subsection{Constraints and Data Validation}
+Implemented constraints:
+\begin{itemize}
+    \item Primary keys on all tables
+    \item Foreign key relationships
+    \item Unique constraints on passport numbers
+    \item Check constraints on flight status
+    \item NOT NULL constraints on required fields
+\end{itemize}
+
+\subsection{Access Control and Security Measures}
+Security features:
+\begin{itemize}
+    \item Password hashing for airport crew
+    \item Role-based access control
+    \item Transaction management for critical operations
+    \item Input validation in stored procedures
+\end{itemize}
+
+\section{Results and Discussion}
+\subsection{Testing and Validation}
+Testing performed:
+\begin{itemize}
+    \item CRUD operation testing
+    \item Stored procedure validation
+    \item Transaction testing
+    \item Performance testing with sample data
+\end{itemize}
+
+\subsection{Challenges and Limitations}
+Challenges faced:
+\begin{itemize}
+    \item Complex relationship management
+    \item Performance optimization
+    \item Data consistency maintenance
+    \item Security implementation
+\end{itemize}
+
+\section{Conclusion}
+The Flight Management System successfully implements a comprehensive database solution for airline operations. Key achievements include:
+\begin{itemize}
+    \item Well-normalized database design
+    \item Efficient query optimization
+    \item Robust security measures
+    \item Comprehensive stored procedures
+\end{itemize}
+
+Future improvements could include:
+\begin{itemize}
+    \item Real-time flight tracking
+    \item Advanced analytics
+    \item Mobile application integration
+    \item Enhanced security features
+\end{itemize}
+
+\clubpenalty=10000
+\widowpenalty=10000
+\raggedbottom
+
+\end{document} 
